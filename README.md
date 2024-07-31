@@ -1,22 +1,21 @@
-[![Community Plus header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Plus.png)](https://opensource.newrelic.com/oss-category/#community-plus)
+<a href="https://opensource.newrelic.com/oss-category/#community-plus"><picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/newrelic/opensource-website/raw/main/src/images/categories/dark/Community_Plus.png"><source media="(prefers-color-scheme: light)" srcset="https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Community_Plus.png"><img alt="New Relic Open Source community plus project banner." src="https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Community_Plus.png"></picture></a>
 
-# New Relic Next.js instrumentation [![Next.js Instrumentation CI][1]][2]
+**Note**: This instrumentation has been merged into the [New Relic Node.js Agent](https://github.com/newrelic/node-newrelic/releases/tag/v12.0.0), please upgrade to v12.0.0 of `newrelic`.
+
+# New Relic Next.js instrumentation 
+[![npm status badge][4]][5] [![Next.js Instrumentation CI][1]][2] [![codecov][6]][7]
 
 This is New Relic's official Next.js framework instrumentation for use with the New Relic [Node.js agent](https://github.com/newrelic/node-newrelic).
 
-This module is a dependency of the agent and is installed by default when you install the agent.
+This module provides instrumentation for server-side rendering via [getServerSideProps](https://nextjs.org/docs/basic-features/data-fetching/get-server-side-props), [middleware](https://nextjs.org/docs/middleware), and New Relic transaction naming for both page and server requests. It does not provide any instrumentation for actions occurring during build or in client-side code.  If you want telemetry data on actions occurring on the client (browser), you can [inject the browser agent](./docs/faqs/browser-agent.md).
 
-This module provides instrumentation for server-side rendering via [getServerSideProps](https://nextjs.org/docs/basic-features/data-fetching/get-server-side-props), [middleware](https://nextjs.org/docs/middleware), and New Relic transaction naming for both page and server requests. It does not provide any instrumentation for actions occurring during build or in client-side code.  If you want telemetry data on actions occurring on the client (browser), you can [inject the browser agent](./docs/inject-browser-agent.md).
+Here are documents for more in-depth explanations about [transaction naming](./docs/transactions.md), and [segments/spans](./docs/segments-and-spans.md).
 
-Here are documents for more in-depth explanations about [transaction naming](./docs/transactions.md), [segments/spans](./docs/segments-and-spans.md), and [injecting the browser agent](./docs/inject-browser-agent.md).
-
-**Note**: The minimum supported Next.js version is [12.0.9](https://github.com/vercel/next.js/releases/tag/v12.0.9).
+**Note**: The minimum supported Next.js version is [12.0.9](https://github.com/vercel/next.js/releases/tag/v12.0.9).  If you are using Next.js middleware the minimum supported version is [12.2.0](https://github.com/vercel/next.js/releases/tag/v12.2.0).
 
 ## Installation
 
-Typically, most users use the version auto-installed by the agent. You can see agent install instructions [here](https://github.com/newrelic/node-newrelic#installation-and-getting-started).
-
-In some cases, installing a specific version is ideal. For example, new features or major changes might be released via a major version update to this module, prior to inclusion in the main New Relic Node.js agent.
+Currently this package is not bundled with the agent, and must be installed as a standalone.  However, the package depends on the agent so you will get all the capabilities of the agent when loading this package.
 
 ```
 npm install @newrelic/next
@@ -46,92 +45,11 @@ For more information, please see the agent [installation guide][3].
 
 ## Getting Started
 
-Our [API and developer documentation](http://newrelic.github.io/node-newrelic/docs/) for writing instrumentation will be of help. We particularly recommend the tutorials and various "shim" API documentation.
+Our [API and developer documentation](http://newrelic.github.io/node-newrelic/) for writing instrumentation will be of help. We particularly recommend the tutorials and various "shim" API documentation.
 
-## Client-side Instrumentation
+## FAQs
 
-Next.js is a full stack React Framework. This module augments the Node.js New Relic agent, thus any client-side actions will not be instrumented. However, below is a method of adding the [New Relic Browser agent](https://docs.newrelic.com/docs/browser/browser-monitoring/getting-started/introduction-browser-monitoring/) to get more information on client-side actions.
-
-```js
-import Head from 'next/head'
-import Layout, { siteTitle } from '../../components/layout'
-import utilStyles from '../../styles/utils.module.css'
-import Link from 'next/link'
-
-
-export async function getServerSideProps() {
-  // You must require agent and put it within this function
-  // otherwise it will try to get bundled by webpack and cause errors.
-  const newrelic = require('newrelic')
-  const browserTimingHeader = newrelic.getBrowserTimingHeader()
-  return {
-    props: {
-      browserTimingHeader
-    }
-  }
-}
-
-export default function Home({ browserTimingHeader }) {
-  return (
-    <Layout home>
-      <Head>
-        <title>{siteTitle}</title>
-      </Head>
-      <div dangerouslySetInnerHTML={{ __html: browserTimingHeader }} />
-      <section className={utilStyles.headingMd}>
-        <p>It me</p>
-        <p>
-          This page uses server-side rendering and uses the newrelic API to inject
-          timing headers.
-        </p>
-        <div>
-          <Link href="/">
-            <a>← Back to home</a>
-          </Link>
-        </div>
-      </section>
-    </Layout>
-  )
-}
-```
-
-For static compiled pages, you can use the [copy-paste method](https://docs.newrelic.com/docs/browser/browser-monitoring/installation/install-browser-monitoring-agent/#copy-paste-app) for enabling the New Relic Browser agent.
-
-For more information, please see the agent [compatibility and requirements][4].
-
-### Error Handling
-
-For capturing both the client and server side errors it is best to use `pages/_error.js` pattern recommended by Next.js documentation on [Advanced Error Page Customization](https://nextjs.org/docs/advanced-features/custom-error-page#more-advanced-error-page-customizing)
-
-This pattern can be used to send either client, server or both types of errors to New Relic.
-
-```js
-function Error({ statusCode }) {
-  return (
-    <p>
-      {statusCode
-        ? `An error ${statusCode} occurred on server`
-        : "An error occurred on client"}
-    </p>
-  );
-}
-
-Error.getInitialProps = ({ res, err }) => {
-  if (typeof window === "undefined") {
-    const newrelic = require('newrelic');
-    newrelic.noticeError(err);
-  } else {
-    window.newrelic.noticeError(err);
-  }
-
-  const statusCode = res ? res.statusCode : err ? err.statusCode : 404;
-  return { statusCode };
-};
-
-export default Error;
-```
-
-The example above assumes that both the New Relic Browser and Node.js agents are integrated. `getInitialProps` function's `if` statement checks whether an error was thrown on the server side (`typeof window === "undefined"`) and if it was the case, it `requires` New Relic Node.js agent and sends an `err` with `noticeError` method. Otherwise it assumes the error was throw on the front-end side, and uses the browser agent to send the error to New Relic by using `window.newrelic.noticeError(err)`.
+If you are having trouble getting the `@newrelic/next` package to instrument Next.js, take a look at our [FAQs](./docs/faqs/README.md).
 
 ## Testing
 
@@ -139,7 +57,7 @@ The module includes a suite of unit and functional tests which should be used to
 verify that your changes don't break existing functionality.
 
 All tests are stored in `tests/` and are written using
-[Tap](https://www.npmjs.com/package/tap) with the extension `.test.js`(unit), or `.tap.js`(versioned).
+[Tap](https://www.npmjs.com/package/tap) with the extension `.test.js` (unit), or `.tap.js` (versioned).
 
 To run the full suite, run: `npm test`.
 
@@ -150,12 +68,19 @@ npm run unit
 npm run versioned
 ```
 
+## Example projects
+
+The following example applications show how to load the `@newrelic/next` instrumentation, inject browser agent, and handle errors:
+
+ * [Pages Router example](https://github.com/newrelic/newrelic-node-examples/tree/58f760e828c45d90391bda3f66764d4420ba4990/nextjs-legacy)
+ * [App Router example](https://github.com/newrelic/newrelic-node-examples/tree/58f760e828c45d90391bda3f66764d4420ba4990/nextjs-app-router)
+
 ## Support
 
 New Relic hosts and moderates an online forum where you can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related community topic in the New Relic Explorers Hub. You can find this project's topic/threads here:
 
 * [New Relic Documentation](https://docs.newrelic.com/docs/agents/nodejs-agent/getting-started/introduction-new-relic-nodejs): Comprehensive guidance for using our platform
-* [New Relic Community](https://discuss.newrelic.com/tags/c/telemetry-data-platform/agents/nodeagent): The best place to engage in troubleshooting questions
+* [New Relic Community](https://forum.newrelic.com/): The best place to engage in troubleshooting questions
 * [New Relic Developer](https://developer.newrelic.com/): Resources for building a custom observability applications
 * [New Relic University](https://learn.newrelic.com/): A range of online training for New Relic users of every level
 * [New Relic Technical Support](https://support.newrelic.com/) 24/7/365 ticketed support. Read more about our [Technical Support Offerings](https://docs.newrelic.com/docs/licenses/license-information/general-usage-licenses/support-plan).
@@ -184,4 +109,7 @@ New Relic Next.js instrumentation also uses source code from third-party librari
 [1]: https://github.com/newrelic/newrelic-node-nextjs/workflows/Next.js%20Instrumentation%20CI/badge.svg
 [2]: https://github.com/newrelic/node-newrelic-nextjs/actions
 [3]: https://docs.newrelic.com/docs/agents/nodejs-agent/installation-configuration/install-nodejs-agent
-[4]: https://docs.newrelic.com/docs/agents/nodejs-agent/getting-started/compatibility-requirements-nodejs-agent
+[4]: https://img.shields.io/npm/v/@newrelic/next.svg 
+[5]: https://www.npmjs.com/package/@newrelic/next
+[6]: https://codecov.io/gh/newrelic/newrelic-node-nextjs/branch/main/graph/badge.svg?token=UPO8LT1X4W 
+[7]: https://codecov.io/gh/newrelic/newrelic-node-nextjs

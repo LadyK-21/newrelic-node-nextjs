@@ -6,5 +6,8 @@
 'use strict'
 module.exports = {
   extends: '@newrelic',
-  ignorePatterns: ['tests/versioned/app']
+  parserOptions: {
+    ecmaVersion: 2020
+  },
+  ignorePatterns: ['tests/versioned/app', 'tests/versioned/app-dir']
 }

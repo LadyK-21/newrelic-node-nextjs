@@ -12,18 +12,28 @@ const tap = require('tap')
 const utils = require('@newrelic/test-utilities')
 utils.assert.extendTap(tap)
 
+const nextPkg = require('next/package.json')
+const semver = require('semver')
+const newServerResponse = semver.gte(nextPkg.version, '13.3.0')
+const noServerClose = semver.gte(nextPkg.version, '13.4.15')
+// In 14.1.0 they removed handling exit event to close server.
+// SIGTERM existed for a few past versions but not all the way back to 13.4.15
+// just emit SIGTERM after 14.1.0
+const closeEvent = semver.gte(nextPkg.version, '14.1.0') ? 'SIGTERM' : 'exit'
+
 /**
  * Builds a Next.js app
+ * @param {sting} dir directory to run next cli in
  * @param {string} [path=app] path to app
  * @returns {Promise}
  *
  */
-helpers.build = function build(path = 'app') {
+helpers.build = function build(dir, path = 'app') {
   return new Promise((resolve, reject) => {
     exec(
       `./node_modules/.bin/next build ${path}`,
       {
-        cwd: __dirname
+        cwd: dir
       },
       function cb(err, data) {
         if (err) {
@@ -38,23 +48,36 @@ helpers.build = function build(path = 'app') {
 
 /**
  * Bootstraps and starts the Next.js app
+ * @param {sting} dir directory to run next cli in
  * @param {string} [path=app] path to app
  * @param {number} [port=3001]
  * @returns {Promise}
  */
-helpers.start = async function start(path = 'app', port = 3001) {
+helpers.start = async function start(dir, path = 'app', port = 3001) {
   // Needed to support the various locations tests may get loaded from (versioned VS tap <file> VS IDE debugger)
-  const fullPath = `${__dirname}/${path}`
+  const fullPath = `${dir}/${path}`
 
-  const { startServer } = require('next/dist/server/lib/start-server')
+  const { startServer } = require(`${dir}/node_modules/next/dist/server/lib/start-server`)
   const app = await startServer({
     dir: fullPath,
-    hostname: 'localhost',
-    port
+    hostname: '0.0.0.0',
+    port,
+    allowRetry: true
   })
 
+  if (noServerClose) {
+    // 13.4.15 updated startServer to have no return value, so we have to use an event emitter instead for cleanup to fire
+    // See: https://github.com/vercel/next.js/blob/canary/packages/next/src/server/lib/start-server.ts#L192
+    return { close: () => process.emit(closeEvent) }
+  }
+
+  if (newServerResponse) {
+    // app is actually a shutdown function, so wrap it for convenience
+    return { close: app }
+  }
+
   await app.prepare()
-  return app
+  return app.options.httpServer
 }
 
 /**
@@ -65,7 +88,7 @@ helpers.start = async function start(path = 'app', port = 3001) {
  * @returns {Promise}
  */
 helpers.makeRequest = function (uri, port = 3001) {
-  const url = `http://localhost:${port}${uri}`
+  const url = `http://0.0.0.0:${port}${uri}`
   return new Promise((resolve, reject) => {
     http
       .get(url, (res) => {
